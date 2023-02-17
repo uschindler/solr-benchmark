@@ -1,4 +1,4 @@
-hostnamePortList: "zoo-node-1:2181,zoo-node-2:2181,zoo-node-3:2181" # SolrCloud on AWS
+hostnamePortList: "localhost:8983"
 solrCollection: "test"
 
 # warm-up and run duration

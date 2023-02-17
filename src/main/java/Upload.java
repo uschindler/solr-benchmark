@@ -38,9 +38,13 @@ import java.io.InputStreamReader;
 import java.util.Map;
 
 import org.apache.solr.client.solrj.SolrClient;
+import org.apache.solr.client.solrj.SolrRequest.METHOD;
 import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.impl.ConcurrentUpdateHttp2SolrClient;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
+import org.apache.solr.client.solrj.request.GenericSolrRequest;
 import org.apache.solr.common.SolrInputDocument;
+import org.apache.solr.common.util.NamedList;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -51,26 +55,16 @@ import com.google.gson.JsonStreamParser;
  * @author deepakr
  */
 public class Upload {
-    private static final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    private static final Gson gson = new GsonBuilder().disableJdkUnsafe().create();
     private static InputStream inputStream;
     private static JsonStreamParser jsonStreamParser;
 
     private static final String solrCollection = "test";
-    private static final int commitWithinInMillis = 10000;
     private static final String hostnamePortList = System.getProperty("hp", "localhost:8983");
 
     private static final int NUM_OF_THREADS = Integer.getInteger("t", 5);
-    private static final SolrClient[] solrClients = new SolrClient[NUM_OF_THREADS];
 
     private static int count = 0;
-
-    static {
-        for (int i = 0; i < NUM_OF_THREADS; i++) {
-            solrClients[i] = new Http2SolrClient
-                    .Builder("http://" + hostnamePortList + "/solr/" + solrCollection)
-                    .build();
-        }
-    }
 
     public static void main(String[] args) throws IOException, SolrServerException, InterruptedException {
         if (args.length != 1) {
@@ -81,45 +75,54 @@ public class Upload {
         inputStream = new FileInputStream(inputFile);
         jsonStreamParser = new JsonStreamParser(new InputStreamReader(inputStream));
 
-        Thread[] threadsArray = new Thread[NUM_OF_THREADS];
-        for (int i = 0; i < NUM_OF_THREADS; i++) {
-            final int clientIndex = i;
-            threadsArray[i] = new Thread(() -> {
-                while (true) {
-                    SolrInputDocument solrInputDocument = getMeTheNextSolrInputDoc();
-                    if (solrInputDocument == null) break;
-                    try {
-                        solrClients[clientIndex].add(solrInputDocument, commitWithinInMillis);
-                    } catch (SolrServerException e) {
-                        System.out.println(e.getCause());
-                    } catch (IOException e) {
-                        System.out.println(e.getCause());
+        try (final var solrClient = new Http2SolrClient
+            .Builder("http://" + hostnamePortList + "/solr/" + solrCollection)
+            .build();
+        final SolrClient bulkClient = new ConcurrentUpdateHttp2SolrClient
+            .Builder("http://" + hostnamePortList + "/solr/" + solrCollection, solrClient)
+            .withThreadCount(NUM_OF_THREADS)
+            .build()) {
+          System.out.println("Delete all documents and committing empty index...");
+          bulkClient.deleteByQuery("*:*");
+          bulkClient.optimize();
+          bulkClient.commit();
+          System.out.println("Start indexing...");
+          SolrInputDocument solrInputDocument;
+          while ((solrInputDocument = getMeTheNextSolrInputDoc()) != null) {
+              try {
+                  bulkClient.add(solrInputDocument);
+                  if (count % 10_000 == 0) {
+                    bulkClient.commit();
+                    System.out.println("Number of docs indexed so far : " + count + " (out of ~12.8M docs)");
+                    long size = getIndexSize(solrClient);
+                    System.out.println("Size of index in bytes so far : " + size);
+                    if (size > 5 * 1024L * 1024 * 1024) {
+                      System.out.println("Size exceeded 5 GiB, stopping indexing after " + count + " documents.");
+                      break;
                     }
-                }
-            });
-
-            threadsArray[i].start();
-        }
-
-        for (int j = 0; j < NUM_OF_THREADS; j++) {
-            threadsArray[j].join();
+                  }
+              } catch (SolrServerException | IOException e) {
+                  System.out.println("Error while indexin doc: " + e);
+              }
+          }
+          System.out.println("Indexing done. Optimizing to one segment and committing...");
+          bulkClient.optimize();
+          bulkClient.commit();
+          long finalSize = getIndexSize(solrClient);
+          System.out.println("Index created. Final index size in bytes: " + finalSize);
         }
     }
 
+    @SuppressWarnings("unchecked")
     private static Map<String, String> getMeTheNextJsonDoc() {
-        synchronized (jsonStreamParser) {
-            if (((count ++) % 10000) == 0) {
-                System.out.println("Number of docs indexed so far : " + count + " (out of ~12.8M docs)");
+        while (jsonStreamParser.hasNext()) {
+            JsonElement e = jsonStreamParser.next();
+            if (e.isJsonObject()) {
+                count++;
+                return gson.fromJson(e, Map.class);
             }
-            SolrInputDocument solrInputDocument = new SolrInputDocument();
-            while (jsonStreamParser.hasNext()) {
-                JsonElement e = jsonStreamParser.next();
-                if (e.isJsonObject()) {
-                    return gson.fromJson(e, Map.class);
-                }
-            }
-            return null;
         }
+        return null;
     }
 
     private static SolrInputDocument getMeTheNextSolrInputDoc() {
@@ -131,5 +134,13 @@ public class Upload {
             solrInputDocument.addField(key, jsonDoc.get(key));
         }
         return solrInputDocument;
+    }
+    
+    @SuppressWarnings("unchecked")
+    private static long getIndexSize(SolrClient solrClient) throws IOException, SolrServerException {
+      GenericSolrRequest admin = new GenericSolrRequest(METHOD.GET, "/admin/segments", null);
+      var result = solrClient.request(admin);
+      var segments = (NamedList<Object>) result.get("segments");
+      return segments.asMap().values().stream().mapToLong(v -> ((Number) (((NamedList<Object>) v).get("sizeInBytes"))).longValue()).sum();
     }
 }

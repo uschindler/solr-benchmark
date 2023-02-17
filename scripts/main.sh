@@ -9,12 +9,6 @@ if [[ -z ${COMMON_LOG_DIR} ]];then
 fi
 mkdir -p ${COMMON_LOG_DIR}
 
-if [[ ! -f ${AWS_PRIVATE_KEY} ]];then
-    fail "Private key: '${AWS_PRIVATE_KEY}' not found.
-    Expected '${AWS_PRIVATE_KEY}' to have been created as part of terraform provision step.
-    See '${WORKING_DIR}/terraform/setup.sh' file"
-fi
-
 trap trapHandler INT QUIT TERM
 trapHandler() {
     log "In trap..."
@@ -22,34 +16,6 @@ trapHandler() {
     stopCluster
     postFinishActions
     exit 1
-}
-
-# Check Zookeeper node status
-zookeeperStatus() {
-    local COMMAND
-    COMMAND="JAVA_HOME=${JAVA_HOME} bash \${HOME}/${ZOOKEEPER}/bin/zkServer.sh status"
-
-    log_wrap "Checking status on all Zookeeper Nodes"
-    runCommandOnZookeeperNodes "${COMMAND}"
-}
-
-# Start Zookeeper nodes
-startZookeeper() {
-    local COMMAND
-    COMMAND="JAVA_HOME=${JAVA_HOME} bash ${ZOOKEEPER}/bin/zkServer.sh start"
-
-    log_wrap "Starting all Zookeeper Nodes"
-    runCommandOnZookeeperNodes "${COMMAND}"
-    zookeeperStatus
-}
-
-# Stop Zookeeper nodes
-stopZookeeper() {
-    local COMMAND
-    COMMAND="JAVA_HOME=${JAVA_HOME} bash ${ZOOKEEPER}/bin/zkServer.sh stop"
-
-    log_wrap "Stopping all Zookeeper Nodes"
-    runCommandOnZookeeperNodes "${COMMAND}"
 }
 
 # Start solr servers
@@ -88,32 +54,6 @@ stopServers() {
     runCommandOnSolrNodes "${COMMAND}"
 }
 
-updateCacheSettings() {
-    log_wrap "Updating the Cache configuration on Solr"
-    if [[ -z ${1} ]];then
-        warn "'updateCacheSettings' expects the first argument to be the cache settings (comma separated if multiple settings are expected)"
-#        echo "Eg: If u want to set query.queryResultCache.size to 1024, then start the script something likes this:"
-        log "bash cacheSetting.sh updateCacheSettings query.queryResultCache.size=1024"
-        log "OR"
-        echo "bash cacheSetting.sh updateCacheSettings query.queryResultCache.size=1024,query.filterCache.maxRamMB=1024"
-        echo "OR"
-        echo "bash cacheSetting.sh updateCacheSettings query.documentCache.size=5120"
-        exit 3
-    fi
-
-    local property
-    local value
-
-    cacheSettings=(${1//,/ })
-    for cacheSetting in "${cacheSettings[@]}"; do
-        log "Applying setting : ${cacheSetting}"
-        property=$(echo ${cacheSetting} | awk -F= '{print $1}')
-        value=$(echo ${cacheSetting} | awk -F= '{print $2}')
-
-        curl -X POST -H 'Content-type: application/json' -d '{"set-property":{"'${property}'":"'${value}'"}}' http://${SOLR_AWS_SERVER[0]}:8983/solr/${COLLECTION_NAME}/config
-    done
-}
-
 startClient() {
     local COMMAND
 
@@ -147,48 +87,6 @@ startClient() {
 stopClient() {
     log_wrap "Stopping client on: ${SOLR_AWS_CLIENT_NAMES[0]} (${SOLR_CLIENTS[0]})"
     runCommandOnClientNode "kill -9 \`ps -ef | grep java | grep -v grep | awk '{print \$2}'\`"
-}
-
-copyLogsFromAWS() {
-    log_wrap "Copying logs from server(s)"
-    for (( i=0; i<${#SOLR_AWS_SERVER[@]}; i++ ));do
-        ssh -i ${AWS_PRIVATE_KEY} -o StrictHostKeyChecking=no \
-            ${AWS_USER}@${SOLR_AWS_SERVER[i]} \
-            "rm /var/solr/logs/solr.log*"
-
-        scp -i ${AWS_PRIVATE_KEY} -r -o StrictHostKeyChecking=no \
-        	${AWS_USER}@${SOLR_AWS_SERVER[i]}:/var/solr/logs ${COMMON_LOG_DIR}/${SOLR_AWS_SERVER_NAMES[i]}
-    done
-
-    log_wrap "Copying logs from client"
-    for (( i=0; i<${#SOLR_CLIENTS[@]}; i++ ));do
-        scp -i ${AWS_PRIVATE_KEY} -o StrictHostKeyChecking=no \
-            ${AWS_USER}@${SOLR_CLIENTS[i]}:/home/${AWS_USER}/*.log ${COMMON_LOG_DIR}/
-    done
-}
-
-cleanLogsOnAWS() {
-    log_wrap "Cleaning logs on server(s)"
-    runCommandOnSolrNodes "rm -r /var/solr/logs/*"
-
-    log_wrap "Cleaning logs on client"
-    runCommandOnClientNode "rm -r *.log;"
-}
-
-killJavaProcs() {
-    log_wrap "Killing JAVA processes on all nodes"
-    local COMMAND="kill -9 \$(ps -ef | pgrep -f \"java\")"
-    runCommandOnAllNodes "${COMMAND}"
-}
-
-startCluster() {
-    startZookeeper
-    startServers
-}
-
-stopCluster() {
-    stopServers
-    stopZookeeper
 }
 
 preStartActions() {
