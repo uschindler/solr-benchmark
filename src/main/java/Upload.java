@@ -30,19 +30,22 @@
  *
  */
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.Map;
+
+import org.apache.solr.client.solrj.SolrClient;
+import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
+import org.apache.solr.common.SolrInputDocument;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonStreamParser;
-import org.apache.solr.client.solrj.SolrClient;
-import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.client.solrj.impl.CloudSolrClient;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
-import org.apache.solr.client.solrj.request.UpdateRequest;
-import org.apache.solr.common.SolrInputDocument;
-
-import java.io.*;
-import java.util.Map;
 
 /**
  * @author deepakr
@@ -56,25 +59,16 @@ public class Upload {
     private static final int commitWithinInMillis = 10000;
     private static final String hostnamePortList = System.getProperty("hp", "localhost:8983");
 
-    private static final boolean isStandaloneSolr = hostnamePortList.contains("8983");
     private static final int NUM_OF_THREADS = Integer.getInteger("t", 5);
     private static final SolrClient[] solrClients = new SolrClient[NUM_OF_THREADS];
 
     private static int count = 0;
 
     static {
-        if (!isStandaloneSolr) {
-            for (int i = 0; i < NUM_OF_THREADS; i++) {
-                solrClients[i] = new CloudSolrClient.Builder()
-                        .withZkHost(hostnamePortList)
-                        .build();
-            }
-        } else {
-            for (int i = 0; i < NUM_OF_THREADS; i++) {
-                solrClients[i] = new HttpSolrClient
-                        .Builder("http://" + hostnamePortList + "/solr/" + solrCollection)
-                        .build();
-            }
+        for (int i = 0; i < NUM_OF_THREADS; i++) {
+            solrClients[i] = new Http2SolrClient
+                    .Builder("http://" + hostnamePortList + "/solr/" + solrCollection)
+                    .build();
         }
     }
 
@@ -94,25 +88,12 @@ public class Upload {
                 while (true) {
                     SolrInputDocument solrInputDocument = getMeTheNextSolrInputDoc();
                     if (solrInputDocument == null) break;
-                    if (!isStandaloneSolr) {
-                        UpdateRequest updateRequest = new UpdateRequest();
-                        updateRequest.setCommitWithin(commitWithinInMillis);
-                        updateRequest.add(solrInputDocument);
-                        try {
-                            solrClients[clientIndex].request(updateRequest, solrCollection);
-                        } catch (SolrServerException e) {
-                            e.printStackTrace();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    } else {
-                        try {
-                            solrClients[clientIndex].add(solrInputDocument, commitWithinInMillis);
-                        } catch (SolrServerException e) {
-                            System.out.println(e.getCause());
-                        } catch (IOException e) {
-                            System.out.println(e.getCause());
-                        }
+                    try {
+                        solrClients[clientIndex].add(solrInputDocument, commitWithinInMillis);
+                    } catch (SolrServerException e) {
+                        System.out.println(e.getCause());
+                    } catch (IOException e) {
+                        System.out.println(e.getCause());
                     }
                 }
             });

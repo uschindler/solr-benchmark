@@ -45,7 +45,6 @@ public interface QueryWorker extends Callable {
     void setRateLimiter(ThroughputController rateLimiter);
     ThroughputController getRateLimiter();
     void setSolrCollection(String solrCollection);
-    void setStandaloneSolr(boolean isStandaloneSolr);
     void setQueryWorkerStats(QueryWorkerStats queryWorkerStats);
     QueryWorkerStats getQueryWorkerStat();
     void closeClientConnections();

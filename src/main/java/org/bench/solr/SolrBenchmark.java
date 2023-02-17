@@ -40,8 +40,6 @@ import org.yaml.snakeyaml.constructor.Constructor;
 import org.loadgen.solr.BenchConfig;
 import org.loadgen.solr.LoadGenerator;
 import org.loadgen.solr.select.LoadGeneratorForSelectQuery;
-import org.loadgen.solr.update.LoadGeneratorForUpdateQuery;
-
 import java.io.FileInputStream;
 
 public class SolrBenchmark {
@@ -77,22 +75,10 @@ public class SolrBenchmark {
         };
         selectLoadGenerator.applyConfig(benchConfig);
 
-        // Update
-        // -----------------------------------
-        final LoadGenerator updateLoadGenerator = new LoadGeneratorForUpdateQuery() {
-            @Override
-            protected String getOperationName() {
-                return "warmup_" + super.getOperationName();
-            }
-        };
-        updateLoadGenerator.applyConfig(benchConfig);
-
         selectLoadGenerator.startBenchmark();
-        updateLoadGenerator.startBenchmark();
 
         try {
             selectLoadGenerator.waitForBenchmarkRunToFinish();
-            updateLoadGenerator.waitForBenchmarkRunToFinish();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -106,18 +92,10 @@ public class SolrBenchmark {
         final LoadGenerator selectLoadGenerator = new LoadGeneratorForSelectQuery();
         selectLoadGenerator.applyConfig(benchConfig);
 
-
-        // Update
-        // -----------------------------------
-        final LoadGenerator updateLoadGenerator = new LoadGeneratorForUpdateQuery();
-        updateLoadGenerator.applyConfig(benchConfig);
-
         selectLoadGenerator.startBenchmark();
-        updateLoadGenerator.startBenchmark();
 
         try {
             selectLoadGenerator.waitForBenchmarkRunToFinish();
-            updateLoadGenerator.waitForBenchmarkRunToFinish();
         } catch (Exception e) {
             e.printStackTrace();
         }

@@ -92,11 +92,6 @@ public class SelectQueryWorker implements QueryWorker {
     }
 
     @Override
-    public void setStandaloneSolr(boolean standaloneSolr) {
-        isStandaloneSolr = standaloneSolr;
-    }
-
-    @Override
     public void setQueryWorkerStats(QueryWorkerStats queryWorkerStats) {
         this.queryWorkerStats = queryWorkerStats;
     }

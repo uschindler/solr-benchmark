@@ -32,20 +32,20 @@
 
 package org.loadgen.solr;
 
-/**
- * @author deepakr
- */
-import org.apache.solr.client.solrj.impl.CloudSolrClient;
-import org.apache.solr.client.solrj.impl.HttpSolrClient;
-
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+
+import org.apache.solr.client.solrj.impl.Http2SolrClient;
 
 public abstract class LoadGenerator {
     private static final java.util.logging.Logger log = java.util.logging.Logger.getLogger(LoadGenerator.class.getName());
@@ -69,7 +69,6 @@ public abstract class LoadGenerator {
     protected QueryWorker[] arrayOfQueryWorkers;
     protected Consumer<Long> externalMetricsConsumer;
 
-    private boolean isStandaloneSolr = false;
     private MetricsCollector metricsCollector;
     private Timer progressTrackingTimer;
 
@@ -85,13 +84,6 @@ public abstract class LoadGenerator {
 
     public LoadGenerator setHostnamePortList(String hostnamePortList) {
         this.hostnamePortList = hostnamePortList;
-
-        // When Solr is used in SolrCloud mode (with Zookeeper), the default ports are 9983/2181
-        // In the standalone (single node) mode, the default Solr port is 8983
-        // If the port is 8983, lets assume it is standalone mode
-        // TODO: allow users to decide standalone/cluster-mode via yaml config file instead of
-        //       assuming port numbers
-        isStandaloneSolr      = hostnamePortList.contains("8983");
         return this;
     }
 
@@ -176,7 +168,6 @@ public abstract class LoadGenerator {
             arrayOfQueryWorkers[i] = this.getQueryWorkerInstance();
             arrayOfQueryWorkers[i].setRunDurationInSec(durationToRunInSec);
             arrayOfQueryWorkers[i].setSolrCollection(solrCollection);
-            arrayOfQueryWorkers[i].setStandaloneSolr(isStandaloneSolr);
             arrayOfQueryWorkers[i].setQueryWorkerStats(new QueryWorkerStats());
 
             // If throughputExpectedToBeAchievedByCurrentWorker somehow becomes 0, RateLimiter.create will throw exception
@@ -185,41 +176,21 @@ public abstract class LoadGenerator {
             arrayOfQueryWorkers[i].setRateLimiter(ThroughputController.getInstance(Math.max(throughputExpectedToBeAchievedByCurrentWorker, 1)));
         }
 
-        if (!isStandaloneSolr) {
-            // distribute clients/connections across threads
-            if (numberOfClients >= numberOfThreads) {
-                for (int i = 0; i < numberOfClients; i++) {
-                    arrayOfQueryWorkers[i % numberOfThreads].addSolrClient(
-                            new CloudSolrClient.Builder()
-                                    .withZkHost(hostnamePortList)
-                                    .build()
-                    );
-                }
-            } else {
-                for (int i = 0; i < numberOfThreads; i++) {
-                    arrayOfQueryWorkers[i].addSolrClient(new CloudSolrClient.Builder()
-                            .withZkHost(hostnamePortList)
-                            .build()
-                    );
-                }
+        if (numberOfClients >= numberOfThreads) {
+            for (int i = 0; i < numberOfClients; i++) {
+                arrayOfQueryWorkers[i % numberOfThreads].addSolrClient(
+                        new Http2SolrClient
+                                .Builder("http://" + hostnamePortList + "/solr/" + solrCollection)
+                                .build()
+                );
             }
         } else {
-            if (numberOfClients >= numberOfThreads) {
-                for (int i = 0; i < numberOfClients; i++) {
-                    arrayOfQueryWorkers[i % numberOfThreads].addSolrClient(
-                            new HttpSolrClient
-                                    .Builder("http://" + hostnamePortList + "/solr/" + solrCollection)
-                                    .build()
-                    );
-                }
-            } else {
-                for (int i = 0; i < numberOfThreads; i++) {
-                    arrayOfQueryWorkers[i % numberOfThreads].addSolrClient(
-                            new HttpSolrClient
-                                    .Builder("http://" + hostnamePortList + "/solr/" + solrCollection)
-                                    .build()
-                    );
-                }
+            for (int i = 0; i < numberOfThreads; i++) {
+                arrayOfQueryWorkers[i % numberOfThreads].addSolrClient(
+                        new Http2SolrClient
+                                .Builder("http://" + hostnamePortList + "/solr/" + solrCollection)
+                                .build()
+                );
             }
         }
     }
