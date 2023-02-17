@@ -78,7 +78,7 @@ public class Upload {
         try (final var solrClient = new Http2SolrClient
             .Builder("http://" + hostnamePortList + "/solr/" + solrCollection)
             .build();
-        final SolrClient bulkClient = new ConcurrentUpdateHttp2SolrClient
+        final var bulkClient = new ConcurrentUpdateHttp2SolrClient
             .Builder("http://" + hostnamePortList + "/solr/" + solrCollection, solrClient)
             .withThreadCount(NUM_OF_THREADS)
             .build()) {
@@ -92,6 +92,7 @@ public class Upload {
               try {
                   bulkClient.add(solrInputDocument);
                   if (count % 10_000 == 0) {
+                    bulkClient.blockUntilFinished();
                     bulkClient.commit();
                     System.out.println("Number of docs indexed so far : " + count + " (out of ~12.8M docs)");
                     long size = getIndexSize(solrClient);
