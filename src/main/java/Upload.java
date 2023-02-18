@@ -59,12 +59,10 @@ public class Upload {
     private static InputStream inputStream;
     private static JsonStreamParser jsonStreamParser;
 
-    private static final String solrCollection = "test";
+    private static final String solrCollection = System.getProperty("c", "test");
     private static final String hostnamePortList = System.getProperty("hp", "localhost:8983");
-
+    private static final long maxSize = Long.getLong("sz", 5L * 1024L * 1024L * 1024L);
     private static final int NUM_OF_THREADS = Integer.getInteger("t", 5);
-
-    private static int count = 0;
 
     public static void main(String[] args) throws IOException, SolrServerException, InterruptedException {
         if (args.length != 1) {
@@ -88,16 +86,18 @@ public class Upload {
           bulkClient.commit();
           System.out.println("Start indexing...");
           SolrInputDocument solrInputDocument;
+          int count = 0;
           while ((solrInputDocument = getMeTheNextSolrInputDoc()) != null) {
               try {
                   bulkClient.add(solrInputDocument);
+                  count++;
                   if (count % 10_000 == 0) {
                     bulkClient.blockUntilFinished();
                     bulkClient.commit();
                     System.out.println("Number of docs indexed so far : " + count + " (out of ~12.8M docs)");
                     long size = getIndexSize(solrClient);
                     System.out.println("Size of index in bytes so far : " + size);
-                    if (size > 5 * 1024L * 1024 * 1024) {
+                    if (size > maxSize) {
                       System.out.println("Size exceeded 5 GiB, stopping indexing after " + count + " documents.");
                       break;
                     }
@@ -119,7 +119,6 @@ public class Upload {
         while (jsonStreamParser.hasNext()) {
             JsonElement e = jsonStreamParser.next();
             if (e.isJsonObject()) {
-                count++;
                 return gson.fromJson(e, Map.class);
             }
         }

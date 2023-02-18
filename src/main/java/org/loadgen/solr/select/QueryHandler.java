@@ -37,15 +37,18 @@ package org.loadgen.solr.select;
  */
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 class QueryHandler {
-    private static final java.util.logging.Logger log = java.util.logging.Logger.getLogger(QueryHandler.class.getName());
+    private static Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     private static final Random random = new Random();
 
@@ -198,7 +201,7 @@ class QueryHandler {
 
     protected static void registerQueryFile(File queryFile, long maxUsableQueries) throws IOException {
         if (!queryFile.exists()) {
-            log.severe("The query file : " + queryFile.getAbsolutePath() + " not found");
+            log.error("The query file : " + queryFile.getAbsolutePath() + " not found");
             System.exit(1);
         }
         // I have named the files like this: <fieldName>_<queryType>.txt

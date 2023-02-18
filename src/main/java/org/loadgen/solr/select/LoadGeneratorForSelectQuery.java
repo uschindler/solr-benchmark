@@ -38,15 +38,18 @@ package org.loadgen.solr.select;
 import org.loadgen.solr.BenchConfig;
 import org.loadgen.solr.LoadGenerator;
 import org.loadgen.solr.QueryWorker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
 public class LoadGeneratorForSelectQuery extends LoadGenerator {
-    private static final java.util.logging.Logger log = java.util.logging.Logger.getLogger(LoadGeneratorForSelectQuery.class.getName());
+  private static Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     private boolean shouldRunSecondaryQueryOps;
     private int maxUsableSelectQueries;

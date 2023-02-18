@@ -32,6 +32,7 @@
 
 package org.loadgen.solr;
 
+import java.lang.invoke.MethodHandles;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -46,9 +47,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public abstract class LoadGenerator {
-    private static final java.util.logging.Logger log = java.util.logging.Logger.getLogger(LoadGenerator.class.getName());
+    private static Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     protected String hostnamePortList;
     protected String solrCollection;
@@ -167,7 +170,6 @@ public abstract class LoadGenerator {
         for (int i = 0; i < numberOfThreads; i++) {
             arrayOfQueryWorkers[i] = this.getQueryWorkerInstance();
             arrayOfQueryWorkers[i].setRunDurationInSec(durationToRunInSec);
-            arrayOfQueryWorkers[i].setSolrCollection(solrCollection);
             arrayOfQueryWorkers[i].setQueryWorkerStats(new QueryWorkerStats());
 
             // If throughputExpectedToBeAchievedByCurrentWorker somehow becomes 0, RateLimiter.create will throw exception
@@ -206,7 +208,7 @@ public abstract class LoadGenerator {
     public void startBenchmark() {
         final long totalRunDurationInSec = getTotalRunDuration();
         if (totalRunDurationInSec == 0 || numberOfThreads == 0 || numberOfClients == 0) {
-            log.warning(String.format("Total run duration (skipDuration + measurement) : %d sec | " +
+            log.warn(String.format("Total run duration (skipDuration + measurement) : %d sec | " +
                             "thread count : %d | " +
                             "numberOfClients = %d\n" +
                             "\tAll the above must be non zero\n" +
@@ -287,7 +289,7 @@ public abstract class LoadGenerator {
         for (int i = 0; i < numberOfWorkers; i++) {
 
             if (!listOfFutures.get(i).isDone()) {
-                log.warning("WARNING : One or more worker is still running ...");
+                log.warn("WARNING : One or more worker is still running ...");
                 return 0;
             }
 

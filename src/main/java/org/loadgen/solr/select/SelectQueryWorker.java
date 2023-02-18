@@ -38,6 +38,8 @@ package org.loadgen.solr.select;
 import org.loadgen.solr.QueryWorker;
 import org.loadgen.solr.QueryWorkerStats;
 import org.loadgen.solr.ThroughputController;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.request.QueryRequest;
@@ -45,18 +47,17 @@ import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.util.NamedList;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 public class SelectQueryWorker implements QueryWorker {
-    private static final java.util.logging.Logger log = java.util.logging.Logger.getLogger(SelectQueryWorker.class.getName());
+    private static Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     private static final Random random = new Random();
 
-    private String solrCollection;
-    private boolean isStandaloneSolr;
     private long runDurationInSec;
     private ThroughputController throughputController;
     private List<SolrClient> solrClientList;
@@ -84,11 +85,6 @@ public class SelectQueryWorker implements QueryWorker {
 
     public SelectQueryWorker() {
         this.solrClientList = new ArrayList<>();
-    }
-
-    @Override
-    public void setSolrCollection(String solrCollection) {
-        this.solrCollection = solrCollection;
     }
 
     @Override
@@ -164,7 +160,7 @@ public class SelectQueryWorker implements QueryWorker {
 
                 SolrQuery solrQuery = new SolrQuery();
                 solrQuery.setStart(0); // start from the 1st doc
-                solrQuery.setRows(10); // limit to only 10 doc
+                solrQuery.setRows(100); // limit to only 10 doc
 
                 solrQuery.setFields("title", "username", "sha1", "timestamp", "id");
 
@@ -208,60 +204,20 @@ public class SelectQueryWorker implements QueryWorker {
                 }
 
                 long intendedStartTimeForCurrentQuery = throughputController.blockUntilIntendedStartTimeOfNextOperation();
-                if (!isStandaloneSolr) {
-                    /*
-                    final QueryResponse response = solrClient.query(solrCollection, solrQuery);
-                    final long latency = response.getElapsedTime()
-                    */
+                final long queryStartTime = System.nanoTime();
+                final QueryResponse queryResponse = solrClient.query(solrQuery);
+                final long queryEndTime = System.nanoTime();
 
-                    // NOTE:
-                    // solrClient.query(...) internally does:
-                    // 1) created updateRequest
-                    // 2) Add the SolrInputDocument
-                    // 3) Call the QueryRequest.process() method
-                    //    3.1) Create QueryResponse object
-                    //    3.2) Call SolrClient.request(...) method
-                    //    3.3) Find out the elapsed time of step 3.2)
-                    // 4) Send the response back
-                    //
-                    // We will do the above step ourselves
-                    // Why ?
-                    // QueryRequest.process() internally does elapsed time calculation and we can use
-                    //     QueryResponse.getElapsedTime() method to get 'latency'. But this is in millis
-                    // I want the elapsed time in nanoSec
+                final long serviceTimeInNanos = queryEndTime - queryStartTime;
+                final long responseTimeInNanos = queryEndTime - intendedStartTimeForCurrentQuery;
 
-                    final QueryRequest queryRequest = new QueryRequest(solrQuery);
-
-                    final long queryStartTime = System.nanoTime();
-                    final NamedList<Object> responseStuff = solrClient.request(queryRequest);
-                    final long queryEndTime = System.nanoTime();
-
-                    final long serviceTimeInNanos = queryEndTime - queryStartTime;
-                    final long responseTimeInNanos = queryEndTime - intendedStartTimeForCurrentQuery;
-
-                    final QueryResponse queryResponse = new QueryResponse();
-                    queryResponse.setResponse(responseStuff);
-
-                    //collectResponseStats(queryResponse);
-                    if (queryWorkerStats != null) {
-                        queryWorkerStats.collect(responseTimeInNanos, serviceTimeInNanos, queryResponse.getQTime());
-                    }
-                } else {
-                    final long queryStartTime = System.nanoTime();
-                    final QueryResponse queryResponse = solrClient.query(solrQuery);
-                    final long queryEndTime = System.nanoTime();
-
-                    final long serviceTimeInNanos = queryEndTime - queryStartTime;
-                    final long responseTimeInNanos = queryEndTime - intendedStartTimeForCurrentQuery;
-
-                    //collectResponseStats(queryResponse);
-                    if (queryWorkerStats != null) {
-                        queryWorkerStats.collect(responseTimeInNanos, serviceTimeInNanos, queryResponse.getQTime());
-                    }
+                //collectResponseStats(queryResponse);
+                if (queryWorkerStats != null) {
+                    queryWorkerStats.collect(responseTimeInNanos, serviceTimeInNanos, queryResponse.getQTime());
                 }
             } catch (Exception e) {
-                log.severe("Cause   : " + e.getCause());
-                log.severe("Message : " + e.getMessage());
+                log.error("Cause   : " + e.getCause());
+                log.error("Message : " + e.getMessage());
                 e.printStackTrace();
             }
             now = System.nanoTime();

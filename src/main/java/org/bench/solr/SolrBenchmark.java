@@ -40,10 +40,14 @@ import org.yaml.snakeyaml.constructor.Constructor;
 import org.loadgen.solr.BenchConfig;
 import org.loadgen.solr.LoadGenerator;
 import org.loadgen.solr.select.LoadGeneratorForSelectQuery;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.FileInputStream;
+import java.lang.invoke.MethodHandles;
 
 public class SolrBenchmark {
-    private static final java.util.logging.Logger log = java.util.logging.Logger.getLogger(SolrBenchmark.class.getName());
+    private static Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     private final BenchConfig benchConfig;
     public SolrBenchmark(String configFile) throws Exception {
