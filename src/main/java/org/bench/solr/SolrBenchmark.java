@@ -68,7 +68,7 @@ public class SolrBenchmark {
     }
 
     public void warmup() {
-        log.info("\nStarting warmup phase ...");
+        log.info("Starting warmup phase ...");
         // Select
         // -----------------------------------
         final LoadGenerator selectLoadGenerator = new LoadGeneratorForSelectQuery() {
@@ -86,11 +86,11 @@ public class SolrBenchmark {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        log.info("\nWarmup phase completed");
+        log.info("Warmup phase completed");
     }
 
     public void run() {
-        log.info("\nStarting measurement phase ...");
+        log.info("Starting measurement phase ...");
         // Select
         // -----------------------------------
         final LoadGenerator selectLoadGenerator = new LoadGeneratorForSelectQuery();
@@ -114,6 +114,6 @@ public class SolrBenchmark {
                 totalRequestsSent,
                 totalRunDurationInSec)
         );
-        log.info("\nMeasurement phase completed");
+        log.info("Measurement phase completed");
     }
 }
