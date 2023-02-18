@@ -233,7 +233,7 @@ public class SelectQueryWorker implements QueryWorker {
                     final QueryRequest queryRequest = new QueryRequest(solrQuery);
 
                     final long queryStartTime = System.nanoTime();
-                    final NamedList<Object> responseStuff = solrClient.request(queryRequest, solrCollection);
+                    final NamedList<Object> responseStuff = solrClient.request(queryRequest);
                     final long queryEndTime = System.nanoTime();
 
                     final long serviceTimeInNanos = queryEndTime - queryStartTime;

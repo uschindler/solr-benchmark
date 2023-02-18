@@ -2,7 +2,7 @@ hostnamePortList: "localhost:8983"
 solrCollection: "test"
 
 # warm-up and run duration
-benchmarkWarmupTime: 300
+benchmarkWarmupTime: 60
 benchmarkMeasurementTime: 900
 
 # resources
