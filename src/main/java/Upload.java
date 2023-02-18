@@ -35,6 +35,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.invoke.MethodHandles;
 import java.util.Map;
 
 import org.apache.solr.client.solrj.SolrClient;
@@ -45,6 +46,8 @@ import org.apache.solr.client.solrj.impl.Http2SolrClient;
 import org.apache.solr.client.solrj.request.GenericSolrRequest;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.util.NamedList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -55,6 +58,8 @@ import com.google.gson.JsonStreamParser;
  * @author deepakr
  */
 public class Upload {
+    private static Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+    
     private static final Gson gson = new GsonBuilder().disableJdkUnsafe().create();
     private static InputStream inputStream;
     private static JsonStreamParser jsonStreamParser;
@@ -66,7 +71,7 @@ public class Upload {
 
     public static void main(String[] args) throws IOException, SolrServerException, InterruptedException {
         if (args.length != 1) {
-            System.err.println("First argument must be json file to be indexed in Solr");
+            log.error("First argument must be json file to be indexed in Solr");
             System.exit(3);
         }
         final File inputFile = new File(args[0]);
@@ -80,11 +85,11 @@ public class Upload {
             .Builder("http://" + hostnamePortList + "/solr/" + solrCollection, solrClient)
             .withThreadCount(NUM_OF_THREADS)
             .build()) {
-          System.out.println("Delete all documents and committing empty index...");
+          log.info("Delete all documents and committing empty index...");
           bulkClient.deleteByQuery("*:*");
           bulkClient.optimize();
           bulkClient.commit();
-          System.out.println("Start indexing...");
+          log.info("Start indexing...");
           SolrInputDocument solrInputDocument;
           int count = 0;
           while ((solrInputDocument = getMeTheNextSolrInputDoc()) != null) {
@@ -94,23 +99,23 @@ public class Upload {
                   if (count % 10_000 == 0) {
                     bulkClient.blockUntilFinished();
                     bulkClient.commit();
-                    System.out.println("Number of docs indexed so far : " + count + " (out of ~12.8M docs)");
+                    log.info("Number of docs indexed so far : " + count + " (out of ~12.8M docs)");
                     long size = getIndexSize(solrClient);
-                    System.out.println("Size of index in bytes so far : " + size);
+                    log.info("Size of index in bytes so far : " + size);
                     if (size > maxSize) {
-                      System.out.println("Size exceeded 5 GiB, stopping indexing after " + count + " documents.");
+                      log.info("Size exceeded 5 GiB, stopping indexing after " + count + " documents.");
                       break;
                     }
                   }
               } catch (SolrServerException | IOException e) {
-                  System.out.println("Error while indexin doc: " + e);
+                  log.info("Error while indexin doc: " + e);
               }
           }
-          System.out.println("Indexing done. Optimizing to one segment and committing...");
+          log.info("Indexing done. Optimizing to one segment and committing...");
           bulkClient.optimize();
           bulkClient.commit();
           long finalSize = getIndexSize(solrClient);
-          System.out.println("Index created. Final index size in bytes: " + finalSize);
+          log.info("Index created. Final index size in bytes: " + finalSize);
         }
     }
 
