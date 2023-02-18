@@ -142,6 +142,6 @@ public class Upload {
       GenericSolrRequest admin = new GenericSolrRequest(METHOD.GET, "/admin/segments", null);
       var result = solrClient.request(admin);
       var segments = (NamedList<Object>) result.get("segments");
-      return segments.asMap().values().stream().mapToLong(v -> ((Number) (((NamedList<Object>) v).get("sizeInBytes"))).longValue()).sum();
+      return segments.asMap().values().stream().mapToLong(v -> (((NamedList<Number>) v).get("sizeInBytes")).longValue()).sum();
     }
 }
