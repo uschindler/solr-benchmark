@@ -32,26 +32,21 @@
 
 package org.loadgen.solr.select;
 
-/**
- * @author deepakr
- */
-import org.loadgen.solr.QueryWorker;
-import org.loadgen.solr.QueryWorkerStats;
-import org.loadgen.solr.ThroughputController;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.apache.solr.client.solrj.SolrClient;
-import org.apache.solr.client.solrj.SolrQuery;
-import org.apache.solr.client.solrj.request.QueryRequest;
-import org.apache.solr.client.solrj.response.QueryResponse;
-import org.apache.solr.common.util.NamedList;
-
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+
+import org.apache.solr.client.solrj.SolrClient;
+import org.apache.solr.client.solrj.SolrQuery;
+import org.apache.solr.client.solrj.response.QueryResponse;
+import org.loadgen.solr.QueryWorker;
+import org.loadgen.solr.QueryWorkerStats;
+import org.loadgen.solr.ThroughputController;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class SelectQueryWorker implements QueryWorker {
     private static Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -160,7 +155,7 @@ public class SelectQueryWorker implements QueryWorker {
 
                 SolrQuery solrQuery = new SolrQuery();
                 solrQuery.setStart(0); // start from the 1st doc
-                solrQuery.setRows(100); // limit to only 10 doc
+                solrQuery.setRows(10); // limit to only 10 doc
 
                 solrQuery.setFields("title", "username", "sha1", "timestamp", "id");
 
