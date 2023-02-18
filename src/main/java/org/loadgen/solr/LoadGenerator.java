@@ -253,6 +253,7 @@ public abstract class LoadGenerator {
         }
 
         progressTrackingTimer.cancel();
+        System.out.println(); // start new line to allow logging to proceed
         setOperationEndTimeInSec();
         closeAllClientConnections();
     }
